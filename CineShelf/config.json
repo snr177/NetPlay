@@ -1,0 +1,20 @@
+{
+    "media_folder": "/home/ubuntu/Downloads",
+    "volume": 80,
+    "aspect_ratio": "Auto",
+    "subtitle_temp_dir": "/tmp/cineshelf_subtitles",
+    "history_file": "~/.cineshelf_history.json",
+    "scan_extensions": [
+        ".mp4", ".mkv", ".avi", ".mov", ".wmv",
+        ".webm", ".mpeg", ".mpg", ".ts", ".m2ts", ".flv",
+        ".mp3", ".aac", ".flac", ".wav", ".ogg", ".m4a"
+    ],
+    "subtitle_extensions": [".srt", ".ass", ".ssa", ".vtt", ".sub"],
+    "seek_step": 5,
+    "volume_step": 5,
+    "controls_hide_delay_ms": 3000,
+    "thumbnail_width": 320,
+    "thumbnail_height": 180,
+    "max_subtitle_download_bytes": 5242880,
+    "subtitle_download_timeout": 15
+}
