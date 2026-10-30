@@ -1,0 +1,901 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#090b10">
+    <title>Cinema — Your video library</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #090b10;
+        color: #f4f4f5;
+        font-synthesis: none;
+        --panel: #11141d;
+        --soft-panel: #191e29;
+        --muted: #9ca3af;
+        --red: #e50914;
+      }
+
+      * { box-sizing: border-box; }
+
+      body { margin: 0; min-width: 320px; min-height: 100vh; }
+
+      button, select, input { font: inherit; }
+
+      button, .file-button {
+        min-height: 38px;
+        border: 1px solid #383d49;
+        border-radius: 6px;
+        background: var(--soft-panel);
+        color: #f4f4f5;
+        padding: 8px 12px;
+        cursor: pointer;
+        transition: background .15s ease, border-color .15s ease;
+      }
+
+      button:hover, .file-button:hover { background: #252b38; border-color: #646a78; }
+      button:focus-visible, select:focus-visible, input:focus-visible, .file-button:focus-within {
+        outline: 2px solid #f4f4f5;
+        outline-offset: 2px;
+      }
+
+      .topbar {
+        min-height: 76px;
+        padding: 14px clamp(16px, 4vw, 44px);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border-bottom: 1px solid #20232c;
+      }
+
+      .brand-mark {
+        width: 34px;
+        height: 34px;
+        display: grid;
+        place-items: center;
+        border-radius: 4px;
+        background: var(--red);
+        color: white;
+        font-size: 20px;
+        font-weight: 900;
+      }
+
+      .brand-name { font-size: 18px; font-weight: 800; letter-spacing: .07em; }
+      .topbar-spacer { flex: 1; }
+      .topbar-note { color: var(--muted); font-size: 12px; }
+      .primary { background: var(--red); border-color: var(--red); font-weight: 700; }
+      .primary:hover { background: #c40812; border-color: #c40812; }
+      .hidden-input { display: none; }
+
+      .layout {
+        min-height: calc(100vh - 77px);
+        padding: 22px clamp(16px, 4vw, 44px);
+        display: grid;
+        grid-template-columns: minmax(230px, 300px) minmax(0, 1fr);
+        gap: 22px;
+      }
+
+      .library {
+        min-height: 420px;
+        max-height: calc(100vh - 122px);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border-radius: 10px;
+        background: var(--panel);
+      }
+
+      .library-heading { padding: 20px 18px 4px; font-size: 14px; font-weight: 800; }
+      .library-path {
+        padding: 0 18px 14px;
+        overflow-wrap: anywhere;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.5;
+      }
+
+      .library-tools { padding: 0 14px; }
+
+      .search {
+        width: 100%;
+        border: 0;
+        border-radius: 6px;
+        background: var(--soft-panel);
+        color: inherit;
+        padding: 10px;
+      }
+
+      .count { padding: 14px 18px 8px; color: var(--muted); font-size: 11px; font-weight: 700; }
+      .video-list { overflow: auto; padding: 0 10px 12px; }
+
+      .video-item {
+        width: 100%;
+        min-height: 52px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        text-align: left;
+        overflow-wrap: anywhere;
+      }
+
+      .video-item.selected { background: #482027; }
+      .video-icon { flex: 0 0 auto; color: #f87171; font-size: 16px; }
+      .empty-library { padding: 12px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+
+      .main { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+      .video-heading { min-height: 55px; }
+      .video-heading h1 { margin: 0; overflow-wrap: anywhere; font-size: clamp(17px, 2vw, 23px); }
+      .shortcuts { margin: 7px 0 0; color: var(--muted); font-size: 11px; }
+
+      .screen {
+        position: relative;
+        min-height: 260px;
+        flex: 1 1 auto;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        border-radius: 8px;
+        background: #020304;
+      }
+
+      video {
+        width: 100%;
+        height: 100%;
+        max-height: calc(100vh - 300px);
+        background: #020304;
+        object-fit: contain;
+      }
+
+      .welcome {
+        position: absolute;
+        z-index: 1;
+        padding: 24px;
+        color: var(--muted);
+        text-align: center;
+        pointer-events: none;
+      }
+
+      .welcome strong { display: block; margin-bottom: 8px; color: white; font-size: 18px; }
+      .controls { border-radius: 8px; background: var(--panel); padding: 12px 14px; }
+      .seek-row { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 12px; }
+      input[type="range"] { accent-color: var(--red); cursor: pointer; }
+      #seek { width: 100%; }
+      .transport, .track-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+      .transport .spacer { flex: 1; }
+      .track-controls select {
+        max-width: min(250px, 48vw);
+        min-height: 38px;
+        border: 1px solid #383d49;
+        border-radius: 6px;
+        background: var(--soft-panel);
+        color: white;
+        padding: 7px 9px;
+      }
+
+      .volume { width: 90px; }
+      .status { min-height: 19px; color: var(--muted); font-size: 12px; }
+      .notice { color: #fbbf24; }
+
+      body.theater .topbar, body.theater .library, body.theater .video-heading,
+      body.theater .status { display: none; }
+
+      body.theater .layout { min-height: 100vh; padding: 0; display: block; }
+      body.theater .main { min-height: 100vh; gap: 0; }
+      body.theater .screen { min-height: calc(100vh - 172px); border-radius: 0; }
+      body.theater video { max-height: calc(100vh - 172px); }
+      body.theater .controls { border-radius: 0; }
+
+      @media (max-width: 850px) {
+        .layout { grid-template-columns: 1fr; }
+        .library { min-height: 180px; max-height: 240px; }
+        .main { min-height: 60vh; }
+        .screen { min-height: 44vh; }
+        video { max-height: 65vh; }
+        .topbar-note { display: none; }
+      }
+
+      @media (max-width: 480px) {
+        .topbar { min-height: 64px; }
+        .layout { padding: 14px; gap: 14px; }
+        .transport button, .track-controls button, .track-controls select { flex: 1 1 auto; }
+        .track-controls select { max-width: 100%; }
+        .shortcuts { line-height: 1.6; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand-mark" aria-hidden="true">N</div>
+      <div class="brand-name">CINEMA</div>
+      <div class="topbar-spacer"></div>
+      <span class="topbar-note">YOUR PERSONAL LIBRARY</span>
+      <label class="file-button primary" for="folderPicker">Choose videos folder</label>
+      <input class="hidden-input" id="folderPicker" type="file" accept="video/*,.mkv,.avi,.mov,.mp4,.webm" webkitdirectory multiple>
+      <label class="file-button" for="videoPicker">Open video</label>
+      <input class="hidden-input" id="videoPicker" type="file" accept="video/*,.mkv,.avi,.mov,.mp4,.webm">
+    </header>
+
+    <div class="layout">
+      <aside class="library" aria-label="Video library">
+        <div class="library-heading">MY LIBRARY</div>
+        <div class="library-path" id="libraryPath">Loading /home/ubuntu/Downloads…</div>
+        <div class="library-tools">
+          <input class="search" id="search" type="search" placeholder="Search videos" aria-label="Search videos">
+        </div>
+        <div class="count" id="videoCount">0 VIDEOS</div>
+        <div class="video-list" id="videoList">
+          <div class="empty-library">Loading your video library…</div>
+        </div>
+      </aside>
+
+      <main class="main">
+        <div class="video-heading">
+          <h1 id="videoTitle">Choose a video to start watching</h1>
+          <p class="shortcuts">← / → &nbsp; 5 sec &nbsp; · &nbsp; Space &nbsp; play/pause &nbsp; · &nbsp; F &nbsp; fullscreen &nbsp; · &nbsp; A &nbsp; aspect &nbsp; · &nbsp; B &nbsp; audio</p>
+        </div>
+
+        <div class="screen" id="screen">
+          <video id="video" playsinline preload="metadata"></video>
+          <div class="welcome" id="welcome">
+            <strong>Your next movie night starts here.</strong>
+            Choose a video folder or open a video to begin.
+          </div>
+        </div>
+
+        <section class="controls" aria-label="Video controls">
+          <div class="seek-row">
+            <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Seek through video">
+            <span id="time">00:00 / 00:00</span>
+          </div>
+          <div class="transport">
+            <button type="button" id="backward" aria-label="Back 5 seconds">−5s</button>
+            <button type="button" id="playPause" class="primary" aria-label="Play or pause">▶</button>
+            <button type="button" id="forward" aria-label="Forward 5 seconds">+5s</button>
+            <span class="spacer"></span>
+            <label for="volume">VOL</label>
+            <input class="volume" id="volume" type="range" min="0" max="100" value="80" aria-label="Volume">
+            <button type="button" id="aspect">Aspect: Original</button>
+            <button type="button" id="fullscreen">Fullscreen</button>
+          </div>
+          <div class="track-controls">
+            <select id="audioTracks" aria-label="Audio track" title="Audio track">
+              <option value="">Audio tracks appear when supported</option>
+            </select>
+            <select id="subtitles" aria-label="Subtitles" title="Subtitles">
+              <option value="off">Subtitles: Off</option>
+            </select>
+            <label class="file-button" for="subtitlePicker">Import subtitle</label>
+            <input class="hidden-input" id="subtitlePicker" type="file" accept=".vtt,.srt,.ass,.ssa,.txt">
+            <button type="button" id="subtitleUrl">Subtitle URL</button>
+          </div>
+        </section>
+        <div class="status" id="status" role="status" aria-live="polite"></div>
+      </main>
+    </div>
+
+    <script>
+      (() => {
+        "use strict";
+
+        const video = document.querySelector("#video");
+        const screen = document.querySelector("#screen");
+        const folderPicker = document.querySelector("#folderPicker");
+        const videoPicker = document.querySelector("#videoPicker");
+        const subtitlePicker = document.querySelector("#subtitlePicker");
+        const videoList = document.querySelector("#videoList");
+        const videoCount = document.querySelector("#videoCount");
+        const libraryPath = document.querySelector("#libraryPath");
+        const search = document.querySelector("#search");
+        const title = document.querySelector("#videoTitle");
+        const welcome = document.querySelector("#welcome");
+        const seek = document.querySelector("#seek");
+        const time = document.querySelector("#time");
+        const playPause = document.querySelector("#playPause");
+        const audioTracks = document.querySelector("#audioTracks");
+        const subtitles = document.querySelector("#subtitles");
+        const status = document.querySelector("#status");
+        const mediaFiles = [];
+        const objectUrls = new Map();
+        const externalTracks = new Map();
+        let currentFile = null;
+        let isSeeking = false;
+        let aspectIndex = 0;
+        let audioTrackList = null;
+        let metadataAudioTracks = [];
+        let playbackFallbackTimer = null;
+
+        const aspects = [
+          ["Original", "contain"],
+          ["16:9", "16 / 9"],
+          ["4:3", "4 / 3"],
+          ["21:9", "21 / 9"],
+        ];
+        const videoExtensions = /\.(3g2?|amv|asf|avi|divx|f4v|flv|m2v|m2ts|m4v|mkv|mod|mov|mp4|mpe?g|mts|mxf|ogv|qt|rmvb?|ts|vob|webm|wmv)$/i;
+
+        function setStatus(message, warning = false) {
+          status.textContent = message;
+          status.classList.toggle("notice", warning);
+        }
+
+        function formatTime(seconds) {
+          if (!Number.isFinite(seconds)) return "00:00";
+          const value = Math.max(0, Math.floor(seconds));
+          const hours = Math.floor(value / 3600);
+          const minutes = Math.floor((value % 3600) / 60);
+          const remaining = value % 60;
+          return hours
+            ? `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(remaining).padStart(2, "0")}`
+            : `${String(minutes).padStart(2, "0")}:${String(remaining).padStart(2, "0")}`;
+        }
+
+        function getObjectUrl(file) {
+          if (!objectUrls.has(file)) objectUrls.set(file, URL.createObjectURL(file));
+          return objectUrls.get(file);
+        }
+
+        function renderLibrary() {
+          const query = search.value.trim().toLocaleLowerCase();
+          const filtered = mediaFiles.filter((entry) => entry.name.toLocaleLowerCase().includes(query));
+          videoList.replaceChildren();
+          videoCount.textContent = `${filtered.length} VIDEO${filtered.length === 1 ? "" : "S"}`;
+          if (!filtered.length) {
+            const empty = document.createElement("div");
+            empty.className = "empty-library";
+            empty.textContent = mediaFiles.length
+              ? "No videos match your search."
+              : "No supported video files found. Choose your Downloads folder.";
+            videoList.append(empty);
+            return;
+          }
+
+          for (const entry of filtered) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = `video-item${entry === currentFile ? " selected" : ""}`;
+            button.title = entry.path || entry.file?.webkitRelativePath || entry.name;
+            const icon = document.createElement("span");
+            icon.className = "video-icon";
+            icon.textContent = "▶";
+            const name = document.createElement("span");
+            name.textContent = entry.name.replace(/\.[^.]+$/, "");
+            button.append(icon, name);
+            button.addEventListener("click", () => playFile(entry));
+            videoList.append(button);
+          }
+        }
+
+        function setLibrary(files, label) {
+          const entries = Array.from(files)
+            .filter((file) => videoExtensions.test(file.name))
+            .map((file) => ({
+              name: file.name,
+              path: file.webkitRelativePath || file.name,
+              file,
+              audioTracks: [],
+            }));
+          mediaFiles.splice(0, mediaFiles.length, ...entries);
+          mediaFiles.sort((a, b) => a.name.localeCompare(b.name));
+          libraryPath.textContent = label;
+          renderLibrary();
+          setStatus(
+            mediaFiles.length
+              ? `Found ${mediaFiles.length} video${mediaFiles.length === 1 ? "" : "s"}. Select one to play.`
+              : "No supported video files found in the selected folder.",
+            mediaFiles.length === 0,
+          );
+        }
+
+        async function prepareBrowserCompatibleVideo(entry) {
+          setStatus(`Converting ${entry.name} to a browser-compatible 1080p copy…`, true);
+          const response = await fetch("/api/compatibility", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ path: entry.path }),
+          });
+          let job = await response.json();
+          if (!response.ok && response.status !== 202) {
+            throw new Error(job.error || `Conversion request failed (${response.status}).`);
+          }
+
+          while (job.status !== "ready") {
+            if (currentFile !== entry) return;
+            if (job.status === "error") {
+              throw new Error(job.error || "Browser compatibility conversion failed.");
+            }
+            if (job.status === "unknown") {
+              throw new Error("The video conversion job was lost. Select the video again to retry.");
+            }
+            setStatus(
+              job.progress
+                ? `Converting browser-compatible video… ${job.progress}%`
+                : "Converting browser-compatible video… This may take a while for large files.",
+              true,
+            );
+            await new Promise((resolve) => setTimeout(resolve, 1500));
+            const statusResponse = await fetch(
+              `/api/compatibility?id=${encodeURIComponent(job.id)}`,
+              { cache: "no-store" },
+            );
+            job = await statusResponse.json();
+            if (!statusResponse.ok) {
+              throw new Error(job.error || `Conversion status failed (${statusResponse.status}).`);
+            }
+          }
+
+          if (currentFile !== entry) return;
+          const catalogResponse = await fetch("/api/videos", { cache: "no-store" });
+          const catalog = await catalogResponse.json();
+          if (!catalogResponse.ok) {
+            throw new Error(catalog.error || `Library refresh failed (${catalogResponse.status}).`);
+          }
+          const compatibleEntry = catalog.videos.find((item) => item.path === entry.path);
+          if (!compatibleEntry || !compatibleEntry.compatible) {
+            throw new Error("The converted video is ready, but the library did not find it.");
+          }
+          Object.assign(entry, compatibleEntry);
+          playFile(entry);
+        }
+
+        function startCompatibilityConversion(entry) {
+          if (entry.compatibilityPromise) return;
+          entry.compatibilityPromise = prepareBrowserCompatibleVideo(entry)
+            .catch((error) => {
+              if (currentFile === entry) {
+                setStatus(`Could not prepare this video for the browser: ${error.message}`, true);
+              }
+            })
+            .finally(() => {
+              delete entry.compatibilityPromise;
+            });
+        }
+
+        function browserCannotDecodeAudio(entry) {
+          const aacTrack = (entry.audioTracks || []).some((track) => track.codec === "AAC");
+          return aacTrack && !document.createElement("audio")
+            .canPlayType('audio/mp4; codecs="mp4a.40.2"');
+        }
+
+        function playFile(entry, autoplay = true) {
+          if (!entry || (!entry.file && !entry.url)) return;
+          if (playbackFallbackTimer) {
+            clearTimeout(playbackFallbackTimer);
+            playbackFallbackTimer = null;
+          }
+          currentFile = entry;
+          metadataAudioTracks = entry.audioTracks || [];
+          title.textContent = entry.name.replace(/\.[^.]+$/, "");
+          welcome.hidden = true;
+          if (!video.paused) video.pause();
+          if (
+            !entry.compatible &&
+            entry.path &&
+            entry.url?.startsWith("/media/") &&
+            browserCannotDecodeAudio(entry)
+          ) {
+            video.removeAttribute("src");
+            video.load();
+            resetTrackMenus();
+            renderLibrary();
+            startCompatibilityConversion(entry);
+            return;
+          }
+          video.src = entry.url || getObjectUrl(entry.file);
+          video.load();
+          video.muted = false;
+          video.volume = Number(document.querySelector("#volume").value) / 100;
+          if (autoplay) {
+            setStatus(`Loading ${entry.name}…`);
+            video.play().catch((error) => {
+              if (error.name === "AbortError") {
+                return;
+              }
+              if (error.name === "NotAllowedError") {
+                setStatus("Video loaded. Press Play to start playback with audio.");
+              } else {
+                setStatus(`Could not play this file: ${error.message}`, true);
+              }
+            });
+          } else {
+            setStatus("Video loaded. Press Play to start playback with audio.");
+          }
+          if (
+            !entry.compatible &&
+            entry.path &&
+            entry.url?.startsWith("/media/")
+          ) {
+            playbackFallbackTimer = window.setTimeout(() => {
+              playbackFallbackTimer = null;
+              if (currentFile === entry && video.readyState === 0) {
+                startCompatibilityConversion(entry);
+              }
+            }, 8000);
+          }
+          resetTrackMenus();
+          renderLibrary();
+        }
+
+        function resetTrackMenus() {
+          audioTracks.replaceChildren();
+          const audioSupport = video.audioTracks;
+          audioTrackList = audioSupport || null;
+          if (audioTrackList && audioTrackList.length) {
+            for (let index = 0; index < audioTrackList.length; index += 1) {
+              const track = audioTrackList[index];
+              const option = document.createElement("option");
+              option.value = String(index);
+              option.textContent = track.label || track.language || `Audio ${index + 1}`;
+              audioTracks.append(option);
+            }
+            updateAudioTrackSelection();
+            audioTracks.disabled = audioTrackList.length < 2;
+          } else if (metadataAudioTracks.length) {
+            for (const [index, track] of metadataAudioTracks.entries()) {
+              const option = document.createElement("option");
+              option.value = String(index);
+              option.textContent = describeAudioTrack(track);
+              audioTracks.append(option);
+            }
+            audioTracks.value = "0";
+            audioTracks.disabled = true;
+          } else {
+            const option = document.createElement("option");
+            option.textContent = "Audio selection unavailable in this browser";
+            option.value = "";
+            audioTracks.append(option);
+            audioTracks.disabled = true;
+          }
+
+          for (const track of externalTracks.values()) {
+            URL.revokeObjectURL(track.url);
+            track.element.remove();
+          }
+          externalTracks.clear();
+          subtitles.replaceChildren();
+          subtitles.add(new Option("Subtitles: Off", "off"));
+          for (let index = 0; index < video.textTracks.length; index += 1) {
+            const track = video.textTracks[index];
+            track.mode = "disabled";
+            const label = track.label || track.language || `Subtitle ${index + 1}`;
+            subtitles.add(new Option(`Subtitles: ${label}`, String(index)));
+          }
+        }
+
+        function updateAudioTrackSelection() {
+          if (!audioTrackList) {
+            if (metadataAudioTracks.length > 1) {
+              setStatus(
+                "This browser does not support switching between audio tracks.",
+                true,
+              );
+            }
+            return;
+          }
+          for (let index = 0; index < audioTrackList.length; index += 1) {
+            audioTrackList[index].enabled = String(index) === audioTracks.value;
+          }
+        }
+
+        function describeAudioTrack(track) {
+          const parts = [];
+          if (track.codec) parts.push(track.codec);
+          if (track.layout || track.channels) {
+            parts.push(track.layout || `${track.channels} channels`);
+          }
+          if (track.sampleRate) parts.push(`${Math.round(track.sampleRate / 1000)} kHz`);
+          if (track.language && !["und", "unknown"].includes(track.language.toLowerCase())) {
+            parts.push(track.language);
+          }
+          return `${track.label || "Audio"} · ${parts.join(" · ") || "default audio"}`;
+        }
+
+        async function loadServerLibrary() {
+          if (location.protocol === "file:") {
+            libraryPath.textContent = "Open this page via the local player server to load the configured video folder.";
+            setStatus("The local video folder is not accessible from a file:// page. Run: python applicatons/player_server.py", true);
+            return;
+          }
+          try {
+            const response = await fetch("/api/videos", { cache: "no-store" });
+            const catalog = await response.json();
+            if (!response.ok) throw new Error(catalog.error || `Library request failed (${response.status}).`);
+            mediaFiles.splice(0, mediaFiles.length, ...catalog.videos);
+            mediaFiles.sort((a, b) => a.name.localeCompare(b.name));
+            libraryPath.textContent = catalog.folder;
+            renderLibrary();
+            setStatus(
+              mediaFiles.length
+                ? `Loaded ${mediaFiles.length} video${mediaFiles.length === 1 ? "" : "s"} from your Downloads folder.`
+                : "No supported videos were found in your Downloads folder.",
+              mediaFiles.length === 0,
+            );
+          } catch (error) {
+            libraryPath.textContent = "Choose your local videos folder, or open a single video.";
+            setStatus(`Could not load /home/ubuntu/Downloads: ${error.message}`, true);
+          }
+        }
+
+        function importSubtitleText(name, text) {
+          const extension = name.split(".").pop().toLowerCase();
+          const vtt = extension === "vtt" ? text : convertSubtitleToVtt(name, text);
+          if (!/^WEBVTT(?:\s|$)/m.test(vtt)) {
+            throw new Error("Subtitle must be a WebVTT, SRT, or supported ASS file.");
+          }
+          const blob = new Blob([vtt], { type: "text/vtt" });
+          const url = URL.createObjectURL(blob);
+          addSubtitleTrack(name, url);
+        }
+
+        function convertSubtitleToVtt(name, text) {
+          const normalized = text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
+          if (/\.(?:ass|ssa)$/i.test(name)) {
+            const cues = [];
+            for (const line of normalized.split("\n")) {
+              if (!line.startsWith("Dialogue:")) continue;
+              const fields = line.slice("Dialogue:".length).trim().split(",", 10);
+              if (fields.length !== 10) continue;
+              const toVttTime = (value) => {
+                const match = value.match(/^(\d+):(\d{2}):(\d{2})\.(\d{1,2})$/);
+                if (!match) return null;
+                return `${String(match[1]).padStart(2, "0")}:${match[2]}:${match[3]}.${(match[4] + "00").slice(0, 3)}`;
+              };
+              const start = toVttTime(fields[1]);
+              const end = toVttTime(fields[2]);
+              const content = fields[9].replace(/\{[^}]*\}/g, "").replace(/\\N/g, "\n").replace(/\\n/g, "\n").replace(/\\h/g, " ");
+              if (start && end && content.trim()) cues.push(`${start} --> ${end}\n${content.trim()}`);
+            }
+            if (!cues.length) throw new Error("No readable ASS subtitle cues were found.");
+            return `WEBVTT\n\n${cues.join("\n\n")}`;
+          }
+          const timestamp = /\b(\d{2}:\d{2}:\d{2}),(\d{1,3})\b/g;
+          return `WEBVTT\n\n${normalized.replace(timestamp, "$1.$2")}`;
+        }
+
+        function addSubtitleTrack(label, url) {
+          const track = document.createElement("track");
+          track.kind = "subtitles";
+          track.label = label;
+          track.srclang = "und";
+          track.src = url;
+          track.default = true;
+          video.append(track);
+          const index = video.textTracks.length - 1;
+          video.textTracks[index].mode = "showing";
+          const option = new Option(`Subtitles: ${label}`, String(index));
+          subtitles.add(option);
+          subtitles.value = String(index);
+          externalTracks.set(String(index), { url, element: track });
+          track.addEventListener("error", () => setStatus("The browser could not load that subtitle track.", true), { once: true });
+          setStatus(`Added subtitles: ${label}`);
+        }
+
+        function fitVideoToAspect() {
+          if (!video.videoWidth || !video.videoHeight) return;
+          const screenWidth = screen.clientWidth;
+          const screenHeight = screen.clientHeight;
+          if (!screenWidth || !screenHeight) return;
+          const selectedAspect = aspects[aspectIndex][1];
+          const ratio = selectedAspect
+            ? Number(selectedAspect.split("/")[0]) / Number(selectedAspect.split("/")[1])
+            : video.videoWidth / video.videoHeight;
+          let width = screenWidth;
+          let height = width / ratio;
+          if (height > screenHeight) {
+            height = screenHeight;
+            width = height * ratio;
+          }
+          video.style.width = `${width}px`;
+          video.style.height = `${height}px`;
+        }
+
+        function togglePlayback() {
+          if (!video.src) return;
+          if (video.paused) {
+            video.play().catch((error) => {
+              if (error.name !== "AbortError") {
+                setStatus(`Could not start playback: ${error.message}`, true);
+              }
+            });
+          } else {
+            video.pause();
+          }
+        }
+
+        function seekBy(seconds) {
+          if (!Number.isFinite(video.duration)) return;
+          video.currentTime = Math.min(video.duration, Math.max(0, video.currentTime + seconds));
+        }
+
+        function toggleFullscreen() {
+          if (document.fullscreenElement) {
+            document.exitFullscreen().catch((error) => setStatus(`Could not exit fullscreen: ${error.message}`, true));
+          } else {
+            screen.requestFullscreen().catch((error) => setStatus(`Fullscreen is unavailable: ${error.message}`, true));
+          }
+        }
+
+        function cycleAudioTrack() {
+          if (!audioTrackList || audioTrackList.length < 2) {
+            setStatus("This browser does not expose multiple audio tracks for this video.", true);
+            return;
+          }
+          const current = Number(audioTracks.value) || 0;
+          audioTracks.value = String((current + 1) % audioTrackList.length);
+          updateAudioTrackSelection();
+        }
+
+        function cycleAspect() {
+          aspectIndex = (aspectIndex + 1) % aspects.length;
+          const [name] = aspects[aspectIndex];
+          document.querySelector("#aspect").textContent = `Aspect: ${name}`;
+          fitVideoToAspect();
+        }
+
+        folderPicker.addEventListener("change", () => {
+          if (!folderPicker.files.length) return;
+          const relativePath = folderPicker.files[0].webkitRelativePath || "";
+          const selectedFolder = relativePath.split("/")[0] || "Selected folder";
+          setLibrary(folderPicker.files, `Folder: ${selectedFolder} (selected for this session)`);
+          if (mediaFiles.length === 1) playFile(mediaFiles[0]);
+        });
+
+        videoPicker.addEventListener("change", () => {
+          const file = videoPicker.files && videoPicker.files[0];
+          if (file) {
+            if (!mediaFiles.some((entry) => entry.file === file)) {
+              setLibrary([file], `Opened file: ${file.name}`);
+            }
+            playFile(mediaFiles.find((entry) => entry.file === file));
+          }
+          videoPicker.value = "";
+        });
+
+        search.addEventListener("input", renderLibrary);
+        playPause.addEventListener("click", togglePlayback);
+        document.querySelector("#backward").addEventListener("click", () => seekBy(-5));
+        document.querySelector("#forward").addEventListener("click", () => seekBy(5));
+        document.querySelector("#fullscreen").addEventListener("click", toggleFullscreen);
+        document.querySelector("#aspect").addEventListener("click", cycleAspect);
+        audioTracks.addEventListener("change", updateAudioTrackSelection);
+        subtitles.addEventListener("change", () => {
+          for (let index = 0; index < video.textTracks.length; index += 1) {
+            video.textTracks[index].mode = String(index) === subtitles.value ? "showing" : "disabled";
+          }
+        });
+
+        subtitlePicker.addEventListener("change", async () => {
+          const file = subtitlePicker.files && subtitlePicker.files[0];
+          if (!file) return;
+          try {
+            importSubtitleText(file.name, await file.text());
+          } catch (error) {
+            setStatus(error.message, true);
+          }
+          subtitlePicker.value = "";
+        });
+
+        document.querySelector("#subtitleUrl").addEventListener("click", async () => {
+          const url = window.prompt("Paste a direct HTTPS or HTTP subtitle URL:");
+          if (!url) return;
+          try {
+            const parsed = new URL(url.trim());
+            if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("Use an HTTP or HTTPS subtitle URL.");
+            const response = await fetch(parsed.href);
+            if (!response.ok) throw new Error(`Subtitle request failed (${response.status}).`);
+            const name = decodeURIComponent(parsed.pathname.split("/").pop() || "Online subtitles");
+            importSubtitleText(name, await response.text());
+          } catch (error) {
+            setStatus(error.message || "Enter a valid subtitle URL. The subtitle host must allow browser access (CORS).", true);
+          }
+        });
+
+        video.addEventListener("click", togglePlayback);
+        video.addEventListener("play", () => { playPause.textContent = "Ⅱ"; });
+        video.addEventListener("pause", () => { playPause.textContent = "▶"; });
+        video.addEventListener("playing", () => {
+          if (playbackFallbackTimer) {
+            clearTimeout(playbackFallbackTimer);
+            playbackFallbackTimer = null;
+          }
+          if (currentFile) setStatus(`Playing ${currentFile.name}`);
+        });
+        video.addEventListener("loadedmetadata", () => {
+          if (playbackFallbackTimer) {
+            clearTimeout(playbackFallbackTimer);
+            playbackFallbackTimer = null;
+          }
+          seek.max = String(Math.max(1, Math.floor(video.duration * 1000)));
+          time.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
+          fitVideoToAspect();
+          resetTrackMenus();
+          if (metadataAudioTracks.length) {
+            setStatus(
+              `Video ready · ${metadataAudioTracks.map(describeAudioTrack).join(" | ")}${!audioTrackList && metadataAudioTracks.length > 1 ? " · this browser cannot switch tracks" : ""}.`,
+              !audioTrackList && metadataAudioTracks.length > 1,
+            );
+          } else if (video.audioTracks && video.audioTracks.length) {
+            setStatus(`Video ready · ${video.audioTracks.length} audio track${video.audioTracks.length === 1 ? "" : "s"}.`);
+          } else {
+            setStatus("Video ready. This browser may not expose audio-track selection.", true);
+          }
+        });
+        video.addEventListener("timeupdate", () => {
+          if (isSeeking) return;
+          seek.value = String(Math.floor(video.currentTime * 1000));
+          time.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
+        });
+        video.addEventListener("error", () => {
+          const code = video.error && video.error.code;
+          const entry = currentFile;
+          if (
+            code === 4 &&
+            entry?.path &&
+            entry.url?.startsWith("/media/") &&
+            !entry.compatible
+          ) {
+            startCompatibilityConversion(entry);
+            return;
+          }
+          const reason = code === 4
+            ? "This browser cannot decode this video codec."
+            : "The video could not be loaded. Try selecting it again.";
+          setStatus(reason, true);
+        });
+
+        seek.addEventListener("input", () => {
+          isSeeking = true;
+          time.textContent = `${formatTime(Number(seek.value) / 1000)} / ${formatTime(video.duration)}`;
+        });
+        seek.addEventListener("change", () => {
+          video.currentTime = Number(seek.value) / 1000;
+          isSeeking = false;
+        });
+        document.querySelector("#volume").addEventListener("input", (event) => {
+          video.volume = Number(event.target.value) / 100;
+        });
+
+        document.addEventListener("keydown", (event) => {
+          if (event.altKey || event.ctrlKey || event.metaKey) return;
+          if (["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
+          if (event.code === "Space") {
+            event.preventDefault();
+            togglePlayback();
+          } else if (event.key === "ArrowLeft") {
+            event.preventDefault();
+            seekBy(-5);
+          } else if (event.key === "ArrowRight") {
+            event.preventDefault();
+            seekBy(5);
+          } else if (event.key.toLowerCase() === "f") {
+            event.preventDefault();
+            toggleFullscreen();
+          } else if (event.key.toLowerCase() === "a") {
+            cycleAspect();
+          } else if (event.key.toLowerCase() === "b") {
+            cycleAudioTrack();
+          } else if (event.key === "Escape" && document.fullscreenElement) {
+            document.exitFullscreen().catch(() => {});
+          }
+        });
+
+        screen.addEventListener("dblclick", toggleFullscreen);
+        window.addEventListener("resize", fitVideoToAspect);
+        document.addEventListener("fullscreenchange", () => {
+          document.body.classList.toggle("theater", Boolean(document.fullscreenElement));
+        });
+
+        window.addEventListener("beforeunload", () => {
+          for (const url of objectUrls.values()) URL.revokeObjectURL(url);
+          for (const track of externalTracks.values()) URL.revokeObjectURL(track.url);
+        });
+
+        video.volume = 0.8;
+        loadServerLibrary();
+      })();
+    </script>
+  </body>
+</html>

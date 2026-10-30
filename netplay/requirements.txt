@@ -1,0 +1,4 @@
+av>=14,<19
+pygame>=2.5,<3
+pillow>=10,<13
+python3-libtorrent
